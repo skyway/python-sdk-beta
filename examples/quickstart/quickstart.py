@@ -22,6 +22,7 @@ import jwt
 from aiortc.mediastreams import MediaStreamTrack, MediaStreamError
 
 from skyway.room import (
+    LocalRoomMember,
     SkyWayContext,
     StreamPublishedEvent,
     Publication,
@@ -88,6 +89,7 @@ async def main(room_name: str) -> None:
 
     receive_tasks: list[asyncio.Task[None]] = []
     context: SkyWayContext | None = None
+    member: LocalRoomMember | None = None
     try:
         token = _generate_auth_token()
 
@@ -103,7 +105,6 @@ async def main(room_name: str) -> None:
         def should_subscribe(pub: Publication) -> bool:
             return (
                 pub.content_type in (ContentType.AUDIO, ContentType.VIDEO)
-                and pub.publisher_id is not None
                 and pub.publisher_id != member.id
             )
 
@@ -135,6 +136,11 @@ async def main(room_name: str) -> None:
         for task in receive_tasks:
             task.cancel()
         await asyncio.gather(*receive_tasks, return_exceptions=True)
+        if member is not None:
+            try:
+                await member.leave()
+            except Exception as e:
+                print(f"Room からの退出に失敗しました: {e}")
         if context is not None:
             await context.dispose()
 
